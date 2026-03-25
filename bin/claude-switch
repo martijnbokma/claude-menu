@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Claude API switch — source this file so exports apply to your shell:
+#   source claude-switch zai
+#   . ~/bin/claude-switch direct
+
+set -euo pipefail
+
+USAGE="${1:-zai}"
+
+case "$USAGE" in
+    direct | anthropic)
+        echo "🔄 Switching to Direct Anthropic API..."
+        export ANTHROPIC_BASE_URL="https://api.anthropic.com"
+        export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="0"
+        ;;
+    zai)
+        echo "🔄 Switching to ZAI API..."
+        export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+        export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+        ;;
+    *)
+        echo "❌ Unknown option: $USAGE"
+        echo "Usage: source $0 [direct|anthropic|zai]"
+        return 1 2>/dev/null || exit 1
+        ;;
+esac
+
+echo "✅ Claude now configured for: $USAGE"
+echo "🚀 Start claude with: claude"
