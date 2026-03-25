@@ -10,11 +10,20 @@ if [[ -f "$CLAUDE_MENU_CONFIG" ]]; then
     source "$CLAUDE_MENU_CONFIG"
 fi
 
+# Optional: load token from macOS Keychain (no plain-text file). Set in ~/.config/claude-menu.env, e.g.:
+#   export CLAUDE_MENU_KEYCHAIN_SERVICE="claude-menu-anthropic"
+# Store once: ./scripts/keychain-store-token.sh
+if [[ "$(uname -s)" == "Darwin" ]] && [[ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]] && [[ -n "${CLAUDE_MENU_KEYCHAIN_SERVICE:-}" ]]; then
+    if t="$(security find-generic-password -s "$CLAUDE_MENU_KEYCHAIN_SERVICE" -w 2>/dev/null)"; then
+        export ANTHROPIC_AUTH_TOKEN="$t"
+    fi
+fi
+
 require_api_token() {
     if [[ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]]; then
         echo ""
         echo "❌ ANTHROPIC_AUTH_TOKEN is not set."
-        echo "   Add it to: $CLAUDE_MENU_CONFIG"
+        echo "   Use macOS Keychain (see README) or add it to: $CLAUDE_MENU_CONFIG"
         echo "   (copy from config.example.env in this repo)"
         echo ""
         read -r -p "Press Enter to continue..."
