@@ -4,116 +4,138 @@
 
 set -euo pipefail
 
-CLAUDE_MENU_CONFIG="${CLAUDE_MENU_CONFIG:-$HOME/.config/claude-menu.env}"
-if [[ -f "$CLAUDE_MENU_CONFIG" ]]; then
-    # shellcheck disable=SC1090
-    source "$CLAUDE_MENU_CONFIG"
-fi
+_cm="${BASH_SOURCE[0]:-$0}"
+while [[ -L "$_cm" ]]; do
+    _d="$(cd "$(dirname "$_cm")" && pwd -P)"
+    _cm="$(readlink "$_cm")"
+    [[ $_cm != /* ]] && _cm="$_d/$_cm"
+done
+_ROOT="$(cd "$(dirname "$_cm")/.." && pwd -P)"
+unset _cm _d
+# shellcheck disable=SC1091
+source "$_ROOT/lib/claude-menu-env.sh"
+# shellcheck disable=SC1091
+source "$_ROOT/lib/claude-menu-modes.sh"
+unset _ROOT
 
-# Optional: load token from macOS Keychain (no plain-text file). Set in ~/.config/claude-menu.env, e.g.:
-#   export CLAUDE_MENU_KEYCHAIN_SERVICE="claude-menu-anthropic"
-# Store once: ./scripts/keychain-store-token.sh
-if [[ "$(uname -s)" == "Darwin" ]] && [[ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]] && [[ -n "${CLAUDE_MENU_KEYCHAIN_SERVICE:-}" ]]; then
-    if t="$(security find-generic-password -s "$CLAUDE_MENU_KEYCHAIN_SERVICE" -w 2>/dev/null)"; then
-        export ANTHROPIC_AUTH_TOKEN="$t"
-    fi
-fi
-
-require_api_token() {
-    if [[ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]]; then
-        echo ""
-        echo "❌ ANTHROPIC_AUTH_TOKEN is not set."
-        echo "   Use macOS Keychain (see README) or add it to: $CLAUDE_MENU_CONFIG"
-        echo "   (copy from config.example.env in this repo)"
-        echo ""
-        read -r -p "Press Enter to continue..."
-        return 1
-    fi
-    return 0
-}
+claude_menu_source_user_config
+claude_menu_load_keychain
+claude_menu_load_generated
+claude_menu_reload_credentials
 
 clear
 
 while true; do
     echo "Claude Configuration Menu"
     echo "=========================="
-    echo "1. Direct Anthropic API (api.anthropic.com)"
-    echo "2. ZAI API (api.z.ai)"
-    echo "3. Claude Pro Subscription (No API Billing)"
-    echo "4. Current Status"
-    echo "5. Test Connection"
-    echo "6. Start Claude"
-    echo "7. Exit"
     echo ""
-    read -r -p "Choose an option [1-7]: " choice
+    echo "  First-time & credentials"
+    echo "  -----------------------"
+    echo "  1. Setup wizard (API key / Keychain / Claude Pro only)"
+    echo ""
+    echo "  Connection mode (pick one)"
+    echo "  ----------------------------"
+    echo "  2. Anthropic API (api.anthropic.com)"
+    echo "  3. Z.ai API (GLM) — model preset…"
+    echo "  4. Claude Pro (subscription — no API billing in shell)"
+    echo ""
+    echo "  Inspect & run"
+    echo "  -------------"
+    echo "  5. Status + connection test"
+    echo "  6. Start Claude (current configuration)"
+    echo "  7. Exit"
+    echo ""
+    read -r -p "Choose [1-7]: " choice
 
     case $choice in
         1)
             echo ""
-            if ! require_api_token; then continue; fi
-            echo "🔄 Switching to Direct Anthropic API..."
-            export ANTHROPIC_BASE_URL="https://api.anthropic.com"
-            export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="0"
-            export API_TIMEOUT_MS="3000000"
-
-            unset ANTHROPIC_DEFAULT_HAIKU_MODEL
-            unset ANTHROPIC_DEFAULT_SONNET_MODEL
-            unset ANTHROPIC_DEFAULT_OPUS_MODEL
-            unset CLAUDE_ENABLED_PLUGINS
-            unset CLAUDE_EXTRA_KNOWN_MARKETPLACES
-
-            echo "✅ Direct Anthropic configuration updated!"
-            echo "   Models: Default Anthropic models"
+            echo "🔧 Running setup (same as scripts/setup.sh)..."
+            echo ""
+            if bash "$CLAUDE_MENU_ROOT/scripts/setup.sh"; then
+                claude_menu_source_user_config
+                claude_menu_load_keychain
+                echo ""
+                echo "✅ Setup finished. Config reloaded for this menu session."
+            else
+                echo ""
+                echo "⚠️  Setup exited with an error or was cancelled."
+            fi
             echo ""
             read -r -p "Press Enter to continue..."
             ;;
         2)
             echo ""
-            if ! require_api_token; then continue; fi
-            echo "🔄 Switching to ZAI API..."
-            export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-            export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
-            export API_TIMEOUT_MS="3000000"
-
-            export ANTHROPIC_DEFAULT_HAIKU_MODEL="${ANTHROPIC_DEFAULT_HAIKU_MODEL:-glm-4.5-air}"
-            export ANTHROPIC_DEFAULT_SONNET_MODEL="${ANTHROPIC_DEFAULT_SONNET_MODEL:-glm-4.7}"
-            export ANTHROPIC_DEFAULT_OPUS_MODEL="${ANTHROPIC_DEFAULT_OPUS_MODEL:-glm-4.7}"
-            export CLAUDE_ENABLED_PLUGINS='{"glm-plan-usage@zai-coding-plugins": true}'
-            if [[ -n "${ZAI_CLAUDE_EXTRA_KNOWN_MARKETPLACES:-}" ]]; then
-                export CLAUDE_EXTRA_KNOWN_MARKETPLACES="$ZAI_CLAUDE_EXTRA_KNOWN_MARKETPLACES"
-            else
-                unset CLAUDE_EXTRA_KNOWN_MARKETPLACES
+            if ! claude_menu_require_api_token; then
+                read -r -p "Press Enter to continue..."
+                continue
             fi
-
-            echo "✅ ZAI configuration updated!"
-            echo "   Models: Haiku=$ANTHROPIC_DEFAULT_HAIKU_MODEL, Sonnet=$ANTHROPIC_DEFAULT_SONNET_MODEL, Opus=$ANTHROPIC_DEFAULT_OPUS_MODEL"
-            echo "   Billing: API Usage"
+            echo "🔄 Switching to Direct Anthropic API..."
+            claude_menu_set_mode 1
+            echo "✅ Direct Anthropic configuration updated!"
+            echo "   Models: Default Anthropic models"
+            claude_menu_print_persist_hint
             echo ""
             read -r -p "Press Enter to continue..."
             ;;
         3)
             echo ""
-            echo "🔄 Switching to Claude Pro Subscription..."
-            unset ANTHROPIC_BASE_URL
-            unset ANTHROPIC_AUTH_TOKEN
-            unset API_TIMEOUT_MS
-            unset ANTHROPIC_DEFAULT_HAIKU_MODEL
-            unset ANTHROPIC_DEFAULT_SONNET_MODEL
-            unset ANTHROPIC_DEFAULT_OPUS_MODEL
-            unset CLAUDE_ENABLED_PLUGINS
-            unset CLAUDE_EXTRA_KNOWN_MARKETPLACES
-            unset CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
-
-            echo "✅ Claude Pro configuration updated!"
-            echo "   Billing: Claude Pro Subscription (No API Usage)"
-            echo "   Models: Default Anthropic models"
+            if ! claude_menu_require_api_token; then
+                read -r -p "Press Enter to continue..."
+                continue
+            fi
+            echo "Z.ai — GLM model preset"
+            echo "-----------------------"
+            echo "  Maps to Claude Code slots: Haiku (fast) / Sonnet / Opus."
+            echo "  1. Default — ${CLAUDE_MENU_ZAI_DEFAULT_HAIKU} / ${CLAUDE_MENU_ZAI_DEFAULT_SONNET} / ${CLAUDE_MENU_ZAI_DEFAULT_OPUS}"
+            echo "  2. GLM-5 — ${CLAUDE_MENU_ZAI_PRESET_GLM5_HAIKU} / ${CLAUDE_MENU_ZAI_PRESET_GLM5_SONNET} / ${CLAUDE_MENU_ZAI_PRESET_GLM5_OPUS}"
+            echo "  3. Back"
             echo ""
-            read -r -p "Press Enter to continue..."
+            read -r -p "Choose [1-3]: " zai_preset
+            case $zai_preset in
+                1)
+                    echo ""
+                    echo "🔄 Z.ai API + default GLM models..."
+                    claude_menu_set_zai_model_preset default
+                    echo "✅ Z.ai configuration updated (default GLM)."
+                    claude_menu_print_persist_hint
+                    echo ""
+                    read -r -p "Press Enter to continue..."
+                    ;;
+                2)
+                    echo ""
+                    echo "🔄 Z.ai API + GLM-5 (Sonnet/Opus slots)..."
+                    claude_menu_set_zai_model_preset glm5
+                    echo "✅ Z.ai configuration updated (GLM-5 preset)."
+                    claude_menu_print_persist_hint
+                    echo ""
+                    read -r -p "Press Enter to continue..."
+                    ;;
+                3 | "")
+                    ;;
+                *)
+                    echo ""
+                    echo "❌ Invalid choice — use 1, 2, or 3."
+                    echo ""
+                    read -r -p "Press Enter to continue..."
+                    ;;
+            esac
             ;;
         4)
             echo ""
-            echo "Current Configuration:"
-            echo "------------------------"
+            echo "🔄 Switching to Claude Pro Subscription..."
+            claude_menu_set_mode 3
+            echo "✅ Claude Pro configuration updated!"
+            echo "   Billing: Claude Pro Subscription (No API Usage)"
+            echo "   Models: Default Anthropic models"
+            claude_menu_print_persist_hint
+            echo ""
+            read -r -p "Press Enter to continue..."
+            ;;
+        5)
+            echo ""
+            echo "Current configuration"
+            echo "----------------------"
             echo "API URL: ${ANTHROPIC_BASE_URL:-'Not set (Claude Pro)'}"
             echo "Auth Token: ${ANTHROPIC_AUTH_TOKEN:+Set}"
             echo "Non-essential Traffic: ${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-'Not set'}"
@@ -124,27 +146,28 @@ while true; do
             echo "Plugins: ${CLAUDE_ENABLED_PLUGINS:-'Not set'}"
             echo "Marketplaces: ${CLAUDE_EXTRA_KNOWN_MARKETPLACES:-'Not set'}"
             echo "Billing: ${ANTHROPIC_BASE_URL:+API Usage}${ANTHROPIC_BASE_URL:-Claude Pro Subscription}"
+            echo "Persistent file: ${CLAUDE_MENU_GENERATED:-$HOME/.config/claude-menu.generated.sh}"
+            if [[ -f "${CLAUDE_MENU_GENERATED:-$HOME/.config/claude-menu.generated.sh}" ]]; then
+                echo "  (exists — applied in new shells if you source claude-menu-shell-env in ~/.zshrc)"
+            else
+                echo "  (not created yet — choose a connection mode 2–4 to save a default)"
+            fi
             echo ""
-            read -r -p "Press Enter to continue..."
-            ;;
-        5)
-            echo ""
-            echo "🧪 Testing connection..."
-            echo "API URL: ${ANTHROPIC_BASE_URL:-'Claude Pro (No API)'}"
-            echo ""
-
+            echo "Connection test"
+            echo "---------------"
+            echo "API URL: ${ANTHROPIC_BASE_URL:-'(none — Claude Pro)'}"
             if command -v curl &>/dev/null; then
                 if [[ -n "${ANTHROPIC_BASE_URL:-}" ]]; then
                     if curl -s --connect-timeout 5 "${ANTHROPIC_BASE_URL}" >/dev/null 2>&1; then
-                        echo "✅ Connection successful!"
+                        echo "✅ Reachable (curl, 5s timeout)"
                     else
-                        echo "❌ Connection failed!"
+                        echo "❌ Not reachable (curl failed or timed out)"
                     fi
                 else
-                    echo "ℹ️  Claude Pro mode - No API connection needed"
+                    echo "ℹ️  No API URL — Claude Pro mode (nothing to ping)"
                 fi
             else
-                echo "⚠️  curl not available - cannot test connection"
+                echo "⚠️  curl not installed — skipped"
             fi
             echo ""
             read -r -p "Press Enter to continue..."

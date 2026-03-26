@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Load saved Claude Code API mode from claude-menu into the current shell.
+# Add once to ~/.zshrc (adjust path to your clone or symlink):
+#   source "$HOME/bin/claude-menu-shell-env"
+#
+# Order: ~/.config/claude-menu.env, Keychain, generated mode, then env+Keychain again so
+# credentials survive legacy generated files that used to unset ANTHROPIC_AUTH_TOKEN in Pro mode.
+# (No set -e here — this file is meant to be sourced and must not alter shell options.)
+
+# zsh: BASH_SOURCE is unset when sourcing; $0 is the path to this file.
+_cm="${BASH_SOURCE[0]:-$0}"
+while [[ -L "$_cm" ]]; do
+    _d="$(cd "$(dirname "$_cm")" && pwd -P)"
+    _cm="$(readlink "$_cm")"
+    [[ $_cm != /* ]] && _cm="$_d/$_cm"
+done
+_ROOT="$(cd "$(dirname "$_cm")/.." && pwd -P)"
+unset _cm _d
+# shellcheck disable=SC1091
+source "$_ROOT/lib/claude-menu-env.sh"
+unset _ROOT
+
+claude_menu_source_user_config
+claude_menu_load_keychain
+claude_menu_load_generated
+claude_menu_reload_credentials

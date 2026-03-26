@@ -1,3 +1,16 @@
+# Secrets & local env (never commit real API keys)
 .env
+.env.*
 *.local.env
+claude-menu.env
+claude-menu.generated.sh
+*.env
+!config.example.env
+
+# Editor / local tooling (may contain paths or session metadata)
+.specstory/
+.cursor/
+
+node_modules/
+
 .DS_Store

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Wrapper: run interactive setup from anywhere (works when symlinked from ~/bin).
+
+set -euo pipefail
+
+_cm="${BASH_SOURCE[0]:-$0}"
+while [[ -L "$_cm" ]]; do
+    _d="$(cd "$(dirname "$_cm")" && pwd -P)"
+    _cm="$(readlink "$_cm")"
+    [[ $_cm != /* ]] && _cm="$_d/$_cm"
+done
+_ROOT="$(cd "$(dirname "$_cm")/.." && pwd -P)"
+unset _cm _d
+
+exec bash "$_ROOT/scripts/setup.sh" "$@"

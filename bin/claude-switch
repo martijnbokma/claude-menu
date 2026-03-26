@@ -1,29 +1,83 @@
 #!/usr/bin/env bash
 # Claude API switch — source this file so exports apply to your shell:
 #   source claude-switch zai
+#   source claude-switch zai-glm5   # Z.ai + GLM-5 preset (Sonnet/Opus slots)
 #   . ~/bin/claude-switch direct
+#   source claude-switch pro   # Claude Pro (subscription), same as claude-menu option 4
+# Persists ~/.config/claude-menu.generated.sh (same as claude-menu options 1–4 / Z.ai presets).
 
 set -euo pipefail
+
+_cm="${BASH_SOURCE[0]:-$0}"
+while [[ -L "$_cm" ]]; do
+    _d="$(cd "$(dirname "$_cm")" && pwd -P)"
+    _cm="$(readlink "$_cm")"
+    [[ $_cm != /* ]] && _cm="$_d/$_cm"
+done
+_ROOT="$(cd "$(dirname "$_cm")/.." && pwd -P)"
+unset _cm _d
+# shellcheck disable=SC1091
+source "$_ROOT/lib/claude-menu-env.sh"
+# shellcheck disable=SC1091
+source "$_ROOT/lib/claude-menu-modes.sh"
+unset _ROOT
+
+claude_menu_source_user_config
+claude_menu_load_keychain
 
 USAGE="${1:-zai}"
 
 case "$USAGE" in
     direct | anthropic)
+        if ! claude_menu_require_api_token; then
+            return 1 2>/dev/null || exit 1
+        fi
         echo "🔄 Switching to Direct Anthropic API..."
-        export ANTHROPIC_BASE_URL="https://api.anthropic.com"
-        export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="0"
+        claude_menu_set_mode 1
+        echo "✅ Claude now configured for: $USAGE"
+        claude_menu_print_persist_hint
+        echo "🚀 Start claude with: claude"
         ;;
     zai)
+        if ! claude_menu_require_api_token; then
+            return 1 2>/dev/null || exit 1
+        fi
         echo "🔄 Switching to ZAI API..."
-        export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-        export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+        claude_menu_set_mode 2
+        echo "✅ Claude now configured for: $USAGE"
+        claude_menu_print_persist_hint
+        echo "🚀 Start claude with: claude"
+        ;;
+    zai-default | zai-4.7)
+        if ! claude_menu_require_api_token; then
+            return 1 2>/dev/null || exit 1
+        fi
+        echo "🔄 ZAI API + default GLM (4.7 family)..."
+        claude_menu_set_zai_model_preset default
+        echo "✅ Claude now configured for: $USAGE"
+        claude_menu_print_persist_hint
+        echo "🚀 Start claude with: claude"
+        ;;
+    zai-glm5 | zai-glm-5)
+        if ! claude_menu_require_api_token; then
+            return 1 2>/dev/null || exit 1
+        fi
+        echo "🔄 ZAI API + GLM-5 preset..."
+        claude_menu_set_zai_model_preset glm5
+        echo "✅ Claude now configured for: $USAGE"
+        claude_menu_print_persist_hint
+        echo "🚀 Start claude with: claude"
+        ;;
+    pro | claude-pro | off | reset)
+        echo "🔄 Switching to Claude Pro (subscription, no API routing in shell)..."
+        claude_menu_set_mode 3
+        echo "✅ Claude Pro mode — API overrides cleared. Start with: claude"
+        claude_menu_print_persist_hint
+        return 0 2>/dev/null || exit 0
         ;;
     *)
         echo "❌ Unknown option: $USAGE"
-        echo "Usage: source $0 [direct|anthropic|zai]"
+        echo "Usage: source $0 [direct|anthropic|zai|zai-default|zai-glm5|pro|off]"
         return 1 2>/dev/null || exit 1
         ;;
 esac
-
-echo "✅ Claude now configured for: $USAGE"
-echo "🚀 Start claude with: claude"
