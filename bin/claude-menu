@@ -18,10 +18,7 @@ source "$_ROOT/lib/claude-menu-env.sh"
 source "$_ROOT/lib/claude-menu-modes.sh"
 unset _ROOT
 
-claude_menu_source_user_config
-claude_menu_load_keychain
-claude_menu_load_generated
-claude_menu_reload_credentials
+claude_menu_apply_shell_env
 
 clear
 
@@ -55,6 +52,7 @@ while true; do
             if bash "$CLAUDE_MENU_ROOT/scripts/setup.sh"; then
                 claude_menu_source_user_config
                 claude_menu_load_keychain
+                # Do not call claude_menu_apply_shell_env here — setup may not have written generated.sh yet.
                 echo ""
                 echo "✅ Setup finished. Config reloaded for this menu session."
             else
@@ -136,8 +134,13 @@ while true; do
             echo ""
             echo "Current configuration"
             echo "----------------------"
+            echo "Menu mode: ${CLAUDE_MENU_MODE:-'(pick 2–4 to save)'}"
             echo "API URL: ${ANTHROPIC_BASE_URL:-'Not set (Claude Pro)'}"
-            echo "Auth Token: ${ANTHROPIC_AUTH_TOKEN:+Set}"
+            if [[ "${CLAUDE_MENU_MODE:-}" == "pro" ]]; then
+                echo "Auth Token: (unset — Claude Pro subscription; key may stay on disk for modes 2–3)"
+            else
+                echo "Auth Token: ${ANTHROPIC_AUTH_TOKEN:+Set}"
+            fi
             echo "Non-essential Traffic: ${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-'Not set'}"
             echo "Timeout: ${API_TIMEOUT_MS:-'Not set'}"
             echo "Haiku Model: ${ANTHROPIC_DEFAULT_HAIKU_MODEL:-'Default'}"
@@ -146,8 +149,8 @@ while true; do
             echo "Plugins: ${CLAUDE_ENABLED_PLUGINS:-'Not set'}"
             echo "Marketplaces: ${CLAUDE_EXTRA_KNOWN_MARKETPLACES:-'Not set'}"
             echo "Billing: ${ANTHROPIC_BASE_URL:+API Usage}${ANTHROPIC_BASE_URL:-Claude Pro Subscription}"
-            echo "Persistent file: ${CLAUDE_MENU_GENERATED:-$HOME/.config/claude-menu.generated.sh}"
-            if [[ -f "${CLAUDE_MENU_GENERATED:-$HOME/.config/claude-menu.generated.sh}" ]]; then
+            echo "Persistent file: ${CLAUDE_MENU_GENERATED}"
+            if [[ -f "${CLAUDE_MENU_GENERATED}" ]]; then
                 echo "  (exists — applied in new shells if you source claude-menu-shell-env in ~/.zshrc)"
             else
                 echo "  (not created yet — choose a connection mode 2–4 to save a default)"

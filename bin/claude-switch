@@ -34,9 +34,7 @@ case "$USAGE" in
         fi
         echo "🔄 Switching to Direct Anthropic API..."
         claude_menu_set_mode 1
-        echo "✅ Claude now configured for: $USAGE"
-        claude_menu_print_persist_hint
-        echo "🚀 Start claude with: claude"
+        claude_menu_print_switch_done "$USAGE"
         ;;
     zai)
         if ! claude_menu_require_api_token; then
@@ -44,9 +42,7 @@ case "$USAGE" in
         fi
         echo "🔄 Switching to ZAI API..."
         claude_menu_set_mode 2
-        echo "✅ Claude now configured for: $USAGE"
-        claude_menu_print_persist_hint
-        echo "🚀 Start claude with: claude"
+        claude_menu_print_switch_done "$USAGE"
         ;;
     zai-default | zai-4.7)
         if ! claude_menu_require_api_token; then
@@ -54,9 +50,7 @@ case "$USAGE" in
         fi
         echo "🔄 ZAI API + default GLM (4.7 family)..."
         claude_menu_set_zai_model_preset default
-        echo "✅ Claude now configured for: $USAGE"
-        claude_menu_print_persist_hint
-        echo "🚀 Start claude with: claude"
+        claude_menu_print_switch_done "$USAGE"
         ;;
     zai-glm5 | zai-glm-5)
         if ! claude_menu_require_api_token; then
@@ -64,9 +58,7 @@ case "$USAGE" in
         fi
         echo "🔄 ZAI API + GLM-5 preset..."
         claude_menu_set_zai_model_preset glm5
-        echo "✅ Claude now configured for: $USAGE"
-        claude_menu_print_persist_hint
-        echo "🚀 Start claude with: claude"
+        claude_menu_print_switch_done "$USAGE"
         ;;
     pro | claude-pro | off | reset)
         echo "🔄 Switching to Claude Pro (subscription, no API routing in shell)..."

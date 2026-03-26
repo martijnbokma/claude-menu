@@ -20,7 +20,4 @@ unset _cm _d
 source "$_ROOT/lib/claude-menu-env.sh"
 unset _ROOT
 
-claude_menu_source_user_config
-claude_menu_load_keychain
-claude_menu_load_generated
-claude_menu_reload_credentials
+claude_menu_apply_shell_env

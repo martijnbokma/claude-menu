@@ -11,6 +11,14 @@ done
 CLAUDE_MENU_ROOT="$(cd "$(dirname "$_claude_menu_env_self")/.." && pwd -P)"
 unset _claude_menu_env_self _d
 
+# Same order as bin/claude-menu-shell-env: user env → Keychain → saved mode → credentials (Pro clears API keys).
+claude_menu_apply_shell_env() {
+    claude_menu_source_user_config
+    claude_menu_load_keychain
+    claude_menu_load_generated
+    claude_menu_reload_credentials
+}
+
 claude_menu_source_user_config() {
     CLAUDE_MENU_CONFIG="${CLAUDE_MENU_CONFIG:-$HOME/.config/claude-menu.env}"
     if [[ -f "$CLAUDE_MENU_CONFIG" ]]; then
@@ -33,14 +41,24 @@ claude_menu_load_generated() {
         # shellcheck disable=SC1090
         source "$CLAUDE_MENU_GENERATED"
     fi
+    # Older generated files only had the comment "(mode: claude-pro)" without CLAUDE_MENU_MODE=
+    if [[ -z "${CLAUDE_MENU_MODE:-}" ]] && [[ -f "${CLAUDE_MENU_GENERATED:-}" ]] && grep -qF 'mode: claude-pro' "$CLAUDE_MENU_GENERATED" 2>/dev/null; then
+        export CLAUDE_MENU_MODE=pro
+    fi
 }
 
 # Re-apply ~/.config/claude-menu.env + Keychain after generated mode is sourced.
-# Legacy generated files for Claude Pro (mode 3) contained `unset ANTHROPIC_AUTH_TOKEN`, which
-# would wipe a key that was just loaded from the env file; credentials must win over routing.
+# For API modes (direct / zai), credentials must be available in the shell.
+# For Claude Pro (subscription), API env vars must stay unset so Claude Code uses
+# subscription auth (docs: ANTHROPIC_API_KEY overrides subscription even when logged in).
+# Keys may remain in claude-menu.env for when you switch back to API modes.
 claude_menu_reload_credentials() {
     claude_menu_source_user_config
     claude_menu_load_keychain
+    if [[ "${CLAUDE_MENU_MODE:-}" == "pro" ]]; then
+        unset ANTHROPIC_AUTH_TOKEN
+        unset ANTHROPIC_API_KEY
+    fi
 }
 
 claude_menu_require_api_token() {
